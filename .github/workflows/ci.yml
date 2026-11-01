@@ -23,5 +23,5 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run tests (standard library only, no installs)
-        run: python -m unittest discover -s tests -t . -v
+            - name: Run SQL tests
+        run: python -m unittest discover -s tests -v
