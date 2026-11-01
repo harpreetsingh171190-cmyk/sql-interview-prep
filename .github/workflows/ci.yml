@@ -23,5 +23,5 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run tests (standard library only, no installs)
-        run: python -m unittest discover -s tests -v
+      - name: Run tests
+        run: python -m unittest -v
