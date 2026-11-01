@@ -126,5 +126,54 @@ class SqlExamplesTest(unittest.TestCase):
         self.assertEqual(names, [("John",), ("Rahul",)])
 
 
+    def test_cte_filters_engineering_staff(self):
+        rows = self.query(
+            "WITH EngineeringStaff AS (SELECT FirstName, Salary FROM Employees "
+            "WHERE DepartmentId = 2) SELECT FirstName, Salary FROM EngineeringStaff "
+            "ORDER BY Salary DESC;"
+        )
+        self.assertEqual(rows, [("Rahul", 72000), ("Meera", 68000)])
+
+    def test_multiple_ctes_total_salary_per_department(self):
+        rows = self.query(
+            "WITH DeptTotals AS (SELECT DepartmentId, SUM(Salary) AS TotalSalary "
+            "FROM Employees WHERE DepartmentId IS NOT NULL GROUP BY DepartmentId) "
+            "SELECT d.DepartmentName, t.TotalSalary FROM DeptTotals AS t "
+            "INNER JOIN Departments AS d ON d.DepartmentId = t.DepartmentId "
+            "ORDER BY d.DepartmentName;"
+        )
+        self.assertEqual(rows, [("Engineering", 140000), ("HR", 52000), ("Sales", 45000)])
+
+    def test_derived_table_filters_group_averages(self):
+        rows = self.query(
+            "SELECT t.DepartmentId, t.AvgSalary FROM (SELECT DepartmentId, AVG(Salary) "
+            "AS AvgSalary FROM Employees WHERE DepartmentId IS NOT NULL "
+            "GROUP BY DepartmentId) AS t WHERE t.AvgSalary > 50000 "
+            "ORDER BY t.DepartmentId;"
+        )
+        self.assertEqual(rows, [(2, 70000.0), (3, 52000.0)])
+
+    def test_not_in_with_null_returns_no_rows(self):
+        rows = self.query(
+            "SELECT DepartmentName FROM Departments "
+            "WHERE DepartmentId NOT IN (SELECT DepartmentId FROM Employees);"
+        )
+        self.assertEqual(rows, [])
+
+    def test_not_in_fixed_with_null_filter_runs(self):
+        rows = self.query(
+            "SELECT DepartmentName FROM Departments WHERE DepartmentId NOT IN "
+            "(SELECT DepartmentId FROM Employees WHERE DepartmentId IS NOT NULL);"
+        )
+        self.assertEqual(rows, [])
+
+    def test_recursive_cte_counts_to_five(self):
+        rows = self.query(
+            "WITH RECURSIVE Numbers(n) AS (SELECT 1 UNION ALL "
+            "SELECT n + 1 FROM Numbers WHERE n < 5) SELECT n FROM Numbers;"
+        )
+        self.assertEqual(rows, [(1,), (2,), (3,), (4,), (5,)])
+
+
 if __name__ == "__main__":
     unittest.main()
