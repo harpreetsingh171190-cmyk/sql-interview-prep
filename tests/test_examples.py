@@ -50,7 +50,6 @@ class SqlExamplesTest(unittest.TestCase):
             if block.upper().startswith("CREATE TABLE"):
                 continue  # the schema is already loaded in setUp
             with self.subTest(file=filename, sql=block[:40]):
-                self.conn.execute("SELECT 1")  # connection still usable
                 self.conn.execute(block.rstrip(";") + ";").fetchall()
 
     def test_null_check_finds_the_employee_without_department(self):
@@ -73,6 +72,58 @@ class SqlExamplesTest(unittest.TestCase):
         names = [r[0] for r in rows]
         self.assertNotIn("Priya", names)
         self.assertEqual(len(rows), 4)
+
+    def test_left_join_count_counts_matches_only(self):
+        rows = self.query(
+            "SELECT d.DepartmentName, COUNT(e.EmployeeId) FROM Departments AS d "
+            "LEFT JOIN Employees AS e ON e.DepartmentId = d.DepartmentId "
+            "GROUP BY d.DepartmentName ORDER BY d.DepartmentName;"
+        )
+        self.assertEqual(rows, [("Engineering", 2), ("HR", 1), ("Sales", 1)])
+
+    def test_having_filters_groups_by_average(self):
+        rows = self.query(
+            "SELECT DepartmentId, AVG(Salary) FROM Employees WHERE DepartmentId IS NOT NULL "
+            "GROUP BY DepartmentId HAVING AVG(Salary) > 50000 ORDER BY DepartmentId;"
+        )
+        self.assertEqual(rows, [(2, 70000.0), (3, 52000.0)])
+
+    def test_scalar_subquery_finds_above_average_salaries(self):
+        rows = self.query(
+            "SELECT FirstName FROM Employees "
+            "WHERE Salary > (SELECT AVG(Salary) FROM Employees) ORDER BY FirstName;"
+        )
+        self.assertEqual(rows, [("Meera",), ("Rahul",)])
+
+    def test_exists_returns_departments_with_employees(self):
+        rows = self.query(
+            "SELECT d.DepartmentName FROM Departments AS d WHERE EXISTS "
+            "(SELECT 1 FROM Employees AS e WHERE e.DepartmentId = d.DepartmentId) "
+            "ORDER BY d.DepartmentName;"
+        )
+        self.assertEqual(rows, [("Engineering",), ("HR",), ("Sales",)])
+
+    def test_case_assigns_salary_bands(self):
+        rows = self.query(
+            "SELECT FirstName, CASE WHEN Salary >= 60000 THEN 'High' "
+            "WHEN Salary >= 45000 THEN 'Medium' ELSE 'Entry' END "
+            "FROM Employees ORDER BY EmployeeId;"
+        )
+        self.assertEqual(rows, [
+            ("Asha", "Medium"), ("Rahul", "High"), ("Meera", "High"),
+            ("John", "Medium"), ("Priya", "Entry"),
+        ])
+
+    def test_distinct_and_like(self):
+        ids = self.query(
+            "SELECT DISTINCT DepartmentId FROM Employees "
+            "WHERE DepartmentId IS NOT NULL ORDER BY DepartmentId;"
+        )
+        self.assertEqual(ids, [(1,), (2,), (3,)])
+        names = self.query(
+            "SELECT FirstName FROM Employees WHERE LastName LIKE 'S%' ORDER BY FirstName;"
+        )
+        self.assertEqual(names, [("John",), ("Rahul",)])
 
 
 if __name__ == "__main__":
